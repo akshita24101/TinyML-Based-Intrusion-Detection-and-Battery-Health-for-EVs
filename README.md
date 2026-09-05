@@ -24,6 +24,8 @@
 - [How It Works](#-how-it-works)
 - [Results](#-results)
 - [Sample Data](#-sample-data)
+- [Scope & Limitations](#-scope--limitations)
+- [Related Publication](#-related-publication)
 - [License](#-license)
 - [Contributors](#-contributors)
 
@@ -35,13 +37,14 @@ As Electric Vehicles evolve towards autonomous driving through **V2X (Vehicle-to
 
 Most existing Intrusion Detection Systems (IDS) rely on **cloud-based architectures** that introduce latency, require frequent internet connectivity, and raise privacy concerns - all of which are critical for such automotive systems.
 
-This project demonstrates an **edge-based IDS** built with **TinyML** that:
+This project is a **proof-of-concept** demonstrating that an IDS of this class fits
+within microcontroller resource limits. It is an **edge-based IDS** built with **TinyML** that:
 
 - Runs entirely on an **ESP32** microcontroller (~$5 hardware).
-- Detects **DoS** and **Fuzzy attacks** in real-time.
+- Detects **DoS** and **Fuzzy attacks** on-device.
 - Operates **fully offline** - no cloud dependency.
 - Preserves **data privacy** - all processing happens on-device.
-- Achieves **84.12% on-device accuracy** with sub-millisecond inference time.
+- Achieves **87.05% test accuracy** with a 48.68 KB model and a 30 KB tensor arena.
 
 ---
 
@@ -63,7 +66,14 @@ This project demonstrates an **edge-based IDS** built with **TinyML** that:
       └─────────────────────────────┘                            └──────────────────────────────────┘
 ```
 
-Both devices connect to the **same WiFi network** simulating a real life V2X scenario, where an attacker node could share the same local network as the vehicle's onboard system while it's charging and inject malicious attacks via CAN network.
+Both devices connect to the **same WiFi network**. Recorded CAN frames are replayed
+over TCP rather than transmitted on a physical CAN bus - **no CAN transceiver
+(e.g. MCP2515/TJA1050) is used anywhere in this project**.
+
+This bench setup exercises the complete on-device path - parsing, preprocessing,
+inference, alerting and logging - which is what the proof of concept sets out to show.
+It does **not** reproduce CAN bus electrical behaviour, arbitration, or real bus timing,
+so it cannot stand in for validation on a live vehicle network.
 
 ---
 
@@ -104,7 +114,7 @@ Both devices connect to the **same WiFi network** simulating a real life V2X sce
 │   └── dataset_prep.ipynb                 # Data preparation & preprocessing notebook
 │
 ├── 📂 02_Model/
-│   ├── 01_IDS_Train_Model.ipynb           # Model training notebook (MLP + XGBoost benchmark)
+│   ├── 01_IDS_Train_Model.ipynb           # Model training notebook (MLP)
 │   ├── 02_confusion_matrix.png            # Confusion matrix visualization
 │   ├── 03_training_history.png            # Training accuracy & loss curves
 │   ├── ids_model.h5                       # Keras model (gitignored)
@@ -132,13 +142,16 @@ Both devices connect to the **same WiFi network** simulating a real life V2X sce
 
 ## 📊 Dataset
 
-- **Source:** CAN bus intrusion dataset containing **~3.5 million CAN frames**
-- **Classes:** 3 - (`Attack_Free`, `DoS`, `Fuzzy`)
+- **Source:** OTIDS CAN intrusion dataset - **4,500,479 raw frames**
+- **Frames used:** **3,505,007** after excluding the 995,472 `Impersonation` frames
+- **Classes:** 3 - `Attack_Free` (2,268,519), `DoS` (656,579), `Fuzzy` (579,909)
+- **Split:** 80/20 stratified train/test (`random_state=42`) - 701,002 test frames
 - **Features per frame:** 10 - `CAN_ID` (numeric), `DLC`, `DATA[0]` through `DATA[7]`
 - **Preprocessing:**
   - CAN IDs converted from hex to numeric
   - Data bytes parsed from hex
   - MinMaxScaler normalization applied
+  - `Impersonation` class dropped (not modelled in this work)
   - Dataset shuffled for training
 
 The `01_Dataset/dataset_prep.ipynb` notebook handles all data preparation steps.
@@ -147,23 +160,31 @@ The `01_Dataset/dataset_prep.ipynb` notebook handles all data preparation steps.
 
 ## 🧠 Model Pipeline
 
-### 1. Benchmark - XGBoost
-- Trained as a baseline classifier
-- Achieved **~92.4% test accuracy**
-- Used to validate dataset quality before neural network training
-
-### 2. Primary Model - MLP (Multi-Layer Perceptron)
-- Designed to be **quantization-friendly** for TFLite conversion
-- **Input:** 10 features (scaled CAN frame data)
+### 1. Primary Model - MLP (Multi-Layer Perceptron)
+- **Architecture:** 10 → 128 → 64 → 32 → 3, ReLU hidden layers, softmax output
+- **Regularization:** Dropout (0.3, 0.2), EarlyStopping, ReduceLROnPlateau
+- **Training:** Adam (lr=0.001), batch size 128, up to 150 epochs with early stopping,
+  20% validation split
+- **Input:** 10 features - `CAN_ID` (numeric), `DLC`, `DATA[0]`–`DATA[7]`
 - **Output:** 3-class softmax (`Attack_Free`, `DoS`, `Fuzzy`)
-- **Activation:** ReLU (hidden layers) + Softmax (output)
-- Trained for **~80 epochs** using Adam optimizer
+
+### 2. Reference Baseline - XGBoost
+- A non-deployable reference point, trained **separately from this notebook**
+  (see `IFIP-2026-Paper/reviews/xgb_benchmark.py` in the paper directory)
+- Achieves **90.79% test accuracy** on the identical split - 3.74 points above the MLP,
+  at roughly **55× the model size** (2.61 MB vs 48.68 KB)
+- Shows the *same* DoS/Fuzzy recall weakness as the MLP, indicating the shortfall is a
+  limitation of the 10-feature representation rather than of model capacity
 
 ### 3. Deployment - TensorFlow Lite
 - Keras model → `.tflite` conversion
 - `.tflite` → C byte array (`model_data.h`) for ESP32 embedding
-- Tensor arena: **30 KB** allocated on ESP32
-- Ops resolved: `FullyConnected`, `Softmax`, `Relu`, `Quantize`, `Dequantize`
+- **Float32** weights - no post-training quantization is applied (`optimizations = []`)
+- Model size: **48.68 KB** (`ids_model.tflite`)
+- Tensor arena: **30 KB** statically allocated on ESP32
+- Ops registered: `FullyConnected`, `Softmax`, `Relu`, `Quantize`, `Dequantize`
+- Conversion is **lossless**: the `.tflite` model reproduces the Keras predictions on
+  100% of the 701,002 test frames (max output difference 1.55e-06)
 
 ---
 
@@ -258,14 +279,21 @@ This generates `ids_model.tflite` and `model_data.h`.
 
 ### Model Performance (Offline Validation)
 
+> All figures below are **offline** metrics computed on the 701,002-frame held-out test
+> set. On-device latency, throughput, RAM/CPU utilization and power draw have **not**
+> been measured - see [Scope & Limitations](#-scope--limitations).
+
 <div align="center">
 
-| Metric | XGBoost (Benchmark) | MLP (TFLite Deployed) |
+| Metric | XGBoost (Reference) | MLP (TFLite Deployed) |
 |---|---|---|
-| **Test Accuracy** | ~92.4% | **84.12%** |
-| **Model Size** | N/A (not deployed) | **~49 KB** (.tflite) |
+| **Test Accuracy** | 90.79% | **87.05%** |
+| **Macro F1** | 0.868 | **0.815** |
+| **MCC** | 0.819 | **0.743** |
+| **ROC-AUC** (OvR macro) | 0.965 | **0.937** |
+| **Model Size** | 2.61 MB | **48.68 KB** (.tflite) |
 | **Tensor Arena** | N/A | **30 KB** |
-| **Target Hardware** | PC | **ESP32** |
+| **Target Hardware** | PC (not deployable on MCU) | **ESP32** |
 
 </div>
 
@@ -281,12 +309,28 @@ This generates `ids_model.tflite` and `model_data.h`.
 
 </div>
 
-### Training History
+### Per-Class Performance (MLP, deployed TFLite model)
 
-The model was trained for ~80 epochs, achieving:
-- **Training accuracy:** ~81%
-- **Validation accuracy:** ~85% (with fluctuations due to data complexity)
-- **Convergence:** Loss steadily decreased for both training and validation sets
+<div align="center">
+
+| Class | Precision | Recall | F1 | FPR | FNR |
+|---|---|---|---|---|---|
+| **Attack_Free** | 0.886 | 0.963 | 0.923 | 0.228 | 0.037 |
+| **DoS** | 0.913 | 0.677 | 0.778 | 0.015 | 0.323 |
+| **Fuzzy** | 0.764 | 0.727 | 0.745 | 0.045 | 0.273 |
+
+</div>
+
+> **Known limitation.** DoS recall (0.68) is the weakest result. The XGBoost reference,
+> despite being ~55× larger, shows the same weakness (0.749 DoS / 0.745 Fuzzy recall).
+> This points to the per-frame 10-feature representation, which carries no inter-frame
+> timing information, rather than to model capacity. DoS on CAN is a timing-preserving
+> attack, so adding inter-arrival-time features is the clearest path to improvement.
+
+### Training
+
+Trained with Adam (lr=0.001), batch size 128, up to 150 epochs with EarlyStopping and
+ReduceLROnPlateau on a 20% validation split.
 
 > 📊 See `02_Model/02_confusion_matrix.png` and `02_Model/03_training_history.png` for visual plots.
 
@@ -318,6 +362,34 @@ Use these sample CAN frames to test the system:
 ```
 
 **Format:** `CAN_ID(decimal), DLC, DATA[0](hex), ..., DATA[7](hex)`
+
+---
+
+## 🔬 Scope & Limitations
+
+This is a feasibility study, and the following are **not** claimed or demonstrated:
+
+- **No on-device performance measurements.** Inference latency, throughput, RAM/CPU
+  utilization, power draw and jitter were never instrumented. Only the static footprint
+  (48.68 KB flash, 30 KB tensor arena) is known.
+- **No physical CAN bus.** Frames are replayed over WiFi/TCP. There is no CAN
+  transceiver, no arbitration, and no bus-accurate timing.
+- **Weak DoS recall (0.68).** See the note in [Results](#-results). Not addressable
+  without inter-frame timing features.
+- **Two attack classes only.** `Impersonation` was excluded; replay, masquerade and
+  bus-off attacks are out of scope.
+- **Single dataset.** Trained and evaluated on OTIDS only, so generalization to other
+  vehicles or bus configurations is untested.
+- **No real-time guarantees.** The system is not evaluated against the deadlines a
+  safety-critical deployment would require.
+
+---
+
+## 📄 Related Publication
+
+This work is described in a paper accepted at **IFIP IoT 2026**. Where the paper and
+this README differ, the paper is authoritative. The benchmark scripts and result files
+backing the numbers above live in the paper's `reviews/` directory.
 
 ---
 
