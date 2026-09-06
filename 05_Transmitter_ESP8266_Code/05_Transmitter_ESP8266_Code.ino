@@ -22,13 +22,13 @@
 // ============================================
 // WIFI CONFIGURATION - UPDATE THESE!
 // ============================================
-const char* WIFI_SSID = "SG_2.4G";        // Change to your WiFi name
-const char* WIFI_PASSWORD = "password123"; // Change to your WiFi password
+const char* WIFI_SSID = "YOUR_WIFI_SSID";          // Your WiFi network name
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";  // Your WiFi password
 
 // ============================================
 // ESP32 RECEIVER CONFIGURATION
 // ============================================
-const char* ESP32_SERVER_IP = "192.168.0.107";   // Update with ESP32's IP address
+const char* ESP32_SERVER_IP = "192.168.0.100";   // ESP32 IP, printed on its Serial Monitor at boot
 const uint16_t ESP32_SERVER_PORT = 8888;         // Port for communication
 
 // ============================================

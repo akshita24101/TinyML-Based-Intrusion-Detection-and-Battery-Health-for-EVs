@@ -30,8 +30,8 @@
 // ============================================
 // WIFI CONFIGURATION - UPDATE THESE!
 // ============================================
-const char* WIFI_SSID = "SG_2.4G";        // Change to your WiFi name
-const char* WIFI_PASSWORD = "password123"; // Change to your WiFi password
+const char* WIFI_SSID = "YOUR_WIFI_SSID";          // Your WiFi network name
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";  // Your WiFi password
 const uint16_t SERVER_PORT = 8888;                // WiFi server port
 
 // ============================================

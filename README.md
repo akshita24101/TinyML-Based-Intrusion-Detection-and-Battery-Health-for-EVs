@@ -231,8 +231,8 @@ This generates `ids_model.tflite` and `model_data.h`.
 2. Ensure `model_data.h` is in the same folder
 3. Update WiFi credentials:
    ```cpp
-   const char* WIFI_SSID = "YourNetwork";
-   const char* WIFI_PASSWORD = "YourPassword";
+   const char* WIFI_SSID = "YOUR_WIFI_SSID";
+   const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
    ```
 4. Select board: **ESP32 Dev Module**
 5. Upload to ESP32
@@ -242,8 +242,8 @@ This generates `ids_model.tflite` and `model_data.h`.
 1. Open `05_Transmitter_ESP8266_Code/05_Transmitter_ESP8266_Code.ino` in Arduino IDE
 2. Update WiFi credentials and **ESP32's IP address**:
    ```cpp
-   const char* WIFI_SSID = "YourNetwork";
-   const char* WIFI_PASSWORD = "YourPassword";
+   const char* WIFI_SSID = "YOUR_WIFI_SSID";
+   const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
    const char* ESP32_SERVER_IP = "192.168.x.x";  // ESP32's IP from step 3
    ```
 3. Select board: **NodeMCU 1.0 (ESP-12E Module)** or equivalent
