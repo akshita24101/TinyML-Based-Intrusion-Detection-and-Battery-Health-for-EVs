@@ -391,11 +391,6 @@ This work is described in a paper accepted at **IFIP IoT 2026**, which reports t
 same figures as this README along with a fuller evaluation and discussion of
 limitations. Where the two differ, the paper is authoritative.
 
-The XGBoost reference was produced by a separate script that is not part of this
-repository. It mirrors the notebook's preprocessing exactly - same feature set, same
-`Impersonation` exclusion, and the same stratified 80/20 split with `random_state=42`
-- so the two models are compared on an identical test partition.
-
 ---
 
 ## 📜 License
