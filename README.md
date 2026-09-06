@@ -169,8 +169,8 @@ The `01_Dataset/dataset_prep.ipynb` notebook handles all data preparation steps.
 - **Output:** 3-class softmax (`Attack_Free`, `DoS`, `Fuzzy`)
 
 ### 2. Reference Baseline - XGBoost
-- A non-deployable reference point, trained **separately from this notebook**
-  (see `IFIP-2026-Paper/reviews/xgb_benchmark.py` in the paper directory)
+- A non-deployable reference point, trained **separately from this notebook** and not
+  included in this repository
 - Achieves **90.79% test accuracy** on the identical split - 3.74 points above the MLP,
   at roughly **55× the model size** (2.61 MB vs 48.68 KB)
 - Shows the *same* DoS/Fuzzy recall weakness as the MLP, indicating the shortfall is a
@@ -387,9 +387,14 @@ This is a feasibility study, and the following are **not** claimed or demonstrat
 
 ## 📄 Related Publication
 
-This work is described in a paper accepted at **IFIP IoT 2026**. Where the paper and
-this README differ, the paper is authoritative. The benchmark scripts and result files
-backing the numbers above live in the paper's `reviews/` directory.
+This work is described in a paper accepted at **IFIP IoT 2026**, which reports the
+same figures as this README along with a fuller evaluation and discussion of
+limitations. Where the two differ, the paper is authoritative.
+
+The XGBoost reference was produced by a separate script that is not part of this
+repository. It mirrors the notebook's preprocessing exactly - same feature set, same
+`Impersonation` exclusion, and the same stratified 80/20 split with `random_state=42`
+- so the two models are compared on an identical test partition.
 
 ---
 
@@ -415,8 +420,6 @@ This project was developed as a **Minor Project (Semester 3)** at **IIIT Naya Ra
 
 <div align="center">
 
-**⭐ If you found this project useful, consider giving it a star!**
-
-*Built with ❤️ using TinyML for a safer automotive future.*
+**If you found this project useful, consider giving it a star!**
 
 </div>
